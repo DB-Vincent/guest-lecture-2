@@ -135,3 +135,66 @@ demo-app   ClusterIP   10.99.237.222   <none>        80/TCP    5s
 ```
 
 As you can see, the service has an IP address, but that IP address is an internal Kubernetes service address. This means we can't access it from outside the cluster. In order to check out our application from inside, we can start a temporary Pod in which we can execute commands. Busybox is an ideal container for this use, start a busybox pod using the following command: `kubectl run -i --tty cluster-access --rm --image=busybox:latest --restart=Never -- /bin/sh`. Once the Pod has started, you should see a shell (`/ #`). In this shell, you can now send an HTTP request to our application using wget: `wget -q -O- <service_name_or_service_cluster_ip>`. You should now see a response from NGINX! Exiting out of the busybox Pod can be done by typing `exit` and hitting Enter.
+
+## Step 4: identifying which pod we're accessing
+
+When you executed the `wget` command in the previous step, you got load balanced to one of our 3 replicas in the Deployment we created earlier. In order to get a view which Pod we actually landed on, we'll add a couple of identifiers to the `index.html` file. For this, we'll use an initContainer. These containers are executed before the containers in the `containers` section are started. This means we can create an index file, put it on a volume and mount that volume to the NGINX container.
+
+So, to get started, add a `initContainers` section to your Deployment's spec section on the `template` level. In the `initContainers` section, add a container that uses the busybox image and executes `echo -en "Running $POD_NAME ($POD_IP) on $NODE_NAME\n" > /nginx-temp/index.html`.
+
+> *Tip*: executing commands when a container starts up can be done using the `command` and `args` parameters inside a container's definition. More information can be found [here](https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#run-a-command-in-a-shell).
+
+The `$POD_NAME`, `$POD_IP` and `$NODE_NAME` environment variables aren't set by default, so we'll need to make sure the container has these set. To do that, you can add an `env` list to your initContainer container. I'll spare you the trouble of looking up the specific parameters needed to retrieve the values for these variables, these are the environment variable definitions:
+
+```yaml
+env:
+- name: NODE_NAME
+  valueFrom:
+  fieldRef:
+    fieldPath: spec.nodeName
+- name: POD_NAME
+  valueFrom:
+  fieldRef:
+    fieldPath: metadata.name
+- name: POD_IP
+  valueFrom:
+  fieldRef:
+    fieldPath: status.podIP
+```
+
+As you might've also noticed, we're trying to write to an `index.html` file in the `/nginx-temp/` directory. This directory should be a volume. For the sake of simplicity, we'll be using an emptyDir volume which you can define like so:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  ...
+spec:
+    spec:
+      initContainers:
+      - name: busybox
+        image: busybox:latest
+        ...
+        volumeMounts:
+        - name: name-of-your-volume
+          mountPath: "/nginx-temp"
+      containers:
+        ...
+      volumes:
+      - name: name-of-your-volume
+        emptyDir: {}
+```
+
+Now that our index file gets generated during the initialization phase of the Pod, we als need to make sure it ends up on our NGINX pod. To do that, you need to add a `volumeMount` to your NGINX container which mounts the emptyDir volume to the `/usr/share/nginx/html` path on your NGINX container.
+
+After all that's done, you can start up your Deployment using the `kubectl apply -f <filename>` command and watch the pods initialize:
+
+```shell
+[vdeborger@node-01 ~]$ kubectl get pods --selector=app=demo
+NAME                       READY   STATUS            RESTARTS   AGE
+demo-app-d9f6d5bd5-f9tt4   0/1     PodInitializing   0          4s
+demo-app-d9f6d5bd5-fsb8d   0/1     PodInitializing   0          4s
+demo-app-d9f6d5bd5-zrpl6   0/1     PodInitializing   0          4s
+```
+
+At first, these pods will be in the "PodsInitializing" status, this means that Kubernetes is starting up our initContainer and is executing the commands we defined. After some time, we should see the status change to "Init:0/1" and eventually to "Running". Once that's the case, you can start up our temporary busybox Pod again and execute the `wget` command a couple of times. You should now see that the requests get distributed across our 3 pods.
