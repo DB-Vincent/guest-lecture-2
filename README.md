@@ -87,4 +87,14 @@ NAME       READY   UP-TO-DATE   AVAILABLE   AGE
 demo-app   3/3     3            3           5s
 ```
 
+When you now list all the pods for that Deployment (which uses the label with name "app" and value "demo"), you should see 3 pods running:
+
+```shell
+[vdeborger@node-01 ~]$ kubectl get pods --selector=app=demo
+NAME                       READY   STATUS    RESTARTS   AGE
+demo-app-8dd45dff6-25nnz   1/1     Running   0          54s
+demo-app-8dd45dff6-tkd8s   1/1     Running   0          54s
+demo-app-8dd45dff6-zpp9v   1/1     Running   0          54s
+```
+
 If - for some reason - the deployment does not start up, try to debug it by checking the events using the `kubectl describe deployments demo-app` command.
