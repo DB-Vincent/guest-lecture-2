@@ -98,3 +98,40 @@ demo-app-8dd45dff6-zpp9v   1/1     Running   0          54s
 ```
 
 If - for some reason - the deployment does not start up, try to debug it by checking the events using the `kubectl describe deployments demo-app` command.
+
+## Step 3: accessing the deployments using a service
+
+Now that we have 3 replica's of our application running, it's time to make add a service so it can be accessed. For this, we'll use a Kubernetes service which not only enables us to access our application, but this also automatically load balances over our replica's. 
+
+Let's start with a basic Service manifest:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: some-cool-deployment-name
+spec:
+  type: some-service-type
+  # Defines the labels which the Service will use to find the Pods that are created for this Deployment. Must match the labels in the template section of the Deployment.
+  selector:
+    a-cool-label-name: a-cool-label-value
+  ports:
+  - protocol: TCP
+    port: 8080
+```
+
+This basic manifest is pretty much all we need, but there are a couple of things that need changing before we can apply it:
+- To keep the same naming convention, let's name the Service "demo-app".
+- We want our application to be available inside the cluster, so set the type to "ClusterIP".
+- The selector should match the Pod labels defined in the Deployment.
+- The port defined in the Service should match the port defined in the Deployment.
+
+Once that's done, apply the Service manifest using the `kubectl apply -f <filename>` command. After executing the command, you should be able to retrieve its status like so:
+
+```shell
+[vdeborger@node-01 ~]$ kubectl get services demo-app
+NAME       TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)   AGE
+demo-app   ClusterIP   10.99.237.222   <none>        80/TCP    5s
+```
+
+As you can see, the service has an IP address, but that IP address is an internal Kubernetes service address. This means we can't access it from outside the cluster. In order to check out our application from inside, we can start a temporary Pod in which we can execute commands. Busybox is an ideal container for this use, start a busybox pod using the following command: `kubectl run -i --tty cluster-access --rm --image=busybox:latest --restart=Never -- /bin/sh`. Once the Pod has started, you should see a shell (`/ #`). In this shell, you can now send an HTTP request to our application using wget: `wget -q -O- <service_name_or_service_cluster_ip>`. You should now see a response from NGINX! Exiting out of the busybox Pod can be done by typing `exit` and hitting Enter.
