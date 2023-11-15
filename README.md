@@ -27,9 +27,9 @@ spec:
 Now, change the example above to match the following settings:
 - The Pod's name should be "demo-app"
 - The container's name should be "nginx"
-- We'll be using the `nginx:latest` container image for our Pod.
-- Add a `ports` section that sets the container port to `80`.
-- Change the label so you have a label with the value "app" and the value "demo". 
+- We'll be using the nginx:latest container image for our Pod.
+- Add a ports section that sets the container port to 80.
+- Change the label so you have a label with the key "app" and the value "demo".
 
 Once your Pod manifest has been adjusted, apply it using the `kubectl apply -f <filename>` command. You should now see your pod starting up:
 
@@ -43,7 +43,7 @@ After some time (usually 30 seconds to a minute), the container image should be 
 
 ## Step 2: creating replica's for our pod
 
-Pods on their own are already pretty usefull, but what do you do when you need multiple instances of your application? Well, that's when you start to use Deployments or ReplicaSets. We'll just be focusing on Deployments as they're the most extensive option of the two.
+Pods on their own are already pretty useful, but what do you do when you need multiple instances of your application? Well, that's when you start to use Deployments or ReplicaSets. We'll just be focusing on Deployments as they're the most extensive option of the two.
 
 A basic Deployment manifest looks a bit like a Pod manifest, just with some additional settings. Here, take a look at an example:
 
@@ -77,7 +77,7 @@ Now, adjust this manifest in the same way as you did for the Pod:
 - The container's name should be "nginx"
 - We'll be using the `nginx:latest` container image for our Deployment.
 - Add a `ports` section that sets the container port to `80`.
-- Change the labels so you have a label with the value "app" and the value "demo". 
+- Change the labels so you have a label with the key "app" and the value "demo".
 
 Once you've configured the Deployment, it's time to apply it using the `kubectl apply -f <filename>` command. This should start up a Deployment (of which you can check the status using the `kubectl get deployments demo-app` command):
 
@@ -87,7 +87,7 @@ NAME       READY   UP-TO-DATE   AVAILABLE   AGE
 demo-app   3/3     3            3           5s
 ```
 
-When you now list all the pods for that Deployment (which uses the label with name "app" and value "demo"), you should see 3 pods running:
+When you now list all the pods for that Deployment (which uses the label with key "app" and value "demo"), you should see 3 pods running:
 
 ```shell
 [vdeborger@node-01 ~]$ kubectl get pods --selector=app=demo
@@ -101,7 +101,7 @@ If - for some reason - the deployment does not start up, try to debug it by chec
 
 ## Step 3: accessing the deployments using a service
 
-Now that we have 3 replica's of our application running, it's time to make add a service so it can be accessed. For this, we'll use a Kubernetes service which not only enables us to access our application, but this also automatically load balances over our replica's. 
+Now that we have 3 replicas of our application running, it's time to add a service so it can be accessed. For this, we'll use a Kubernetes service which not only enables us to access our application, but this also automatically load balances over our replicas.
 
 Let's start with a basic Service manifest:
 
@@ -197,4 +197,4 @@ demo-app-d9f6d5bd5-fsb8d   0/1     PodInitializing   0          4s
 demo-app-d9f6d5bd5-zrpl6   0/1     PodInitializing   0          4s
 ```
 
-At first, these pods will be in the "PodsInitializing" status, this means that Kubernetes is starting up our initContainer and is executing the commands we defined. After some time, we should see the status change to "Init:0/1" and eventually to "Running". Once that's the case, you can start up our temporary busybox Pod again and execute the `wget` command a couple of times. You should now see that the requests get distributed across our 3 pods.
+At first, these pods will be in the "PodsInitializing" status; this means that Kubernetes is starting up our initContainer and is executing the commands we defined. After some time, we should see the status change to "Init:0/1" and eventually to "Running". Once that's the case, you can start up our temporary busybox Pod again and execute the `wget` command a couple of times. You should now see that the requests get distributed across our 3 pods.
