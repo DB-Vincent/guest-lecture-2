@@ -84,7 +84,7 @@ Once you've configured the Deployment, it's time to apply it using the `kubectl 
 ```shell
 [vdeborger@node-01 ~]$ kubectl get deployments demo-app
 NAME       READY   UP-TO-DATE   AVAILABLE   AGE
-demo-app   1/1     1            1           5s
+demo-app   3/3     3            3           5s
 ```
 
 If - for some reason - the deployment does not start up, try to debug it by checking the events using the `kubectl describe deployments demo-app` command.
