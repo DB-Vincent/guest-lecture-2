@@ -220,7 +220,7 @@ kubectl patch deployment metrics-server --namespace kube-system --type='json' \
 
 After a minute or two, you should see that the metrics-server is healthy with a running pod.
 
-### Step 5b: actually horizontally scaling our Deployment
+### Step 5b: setting up horizontal scaling for our Deployment
 
 Now that the metrics-server has been installed, we can create [a Horizontal Pod Autoscaler (HPA)](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/) which will use the metrics exposed by the metrics-server to decide whether extra replica's are required. To do so, we'll start off from a basic template and adjust it to our needs.
 
@@ -262,7 +262,7 @@ Once that's done, we'll set up the auto scaling part:
 
 Alright, that's it! Let's apply the Kubernetes manifest and see it in action. After executing the `kubectl apply -f <filename>` command, you can check the status of the HPA using the `kubectl get hpa <hpa-name>` command.
 
-As you might notice, the HPA reports `<unknown>/25%` in the Targets column. This is because we didn't set any resource limits inside our Deployment. In Kubernetes, a resource request is the amount of CPU or memory that a container initially requests to run, ensuring that the cluster places it on a node with sufficient capacity. Resource limits, on the other hand, define the maximum amount of CPU or memory a container is allowed to consume, preventing it from taking up all the resources and potentially affecting the stability of other containers on the same node. In order to set a resource limit on the Deployment, edit the Kubernetes manifest so it includes an `resources` section in the container specification.
+As you might notice, the HPA reports `<unknown>/25%` in the Targets column. This is because we didn't set any resource requests/limits inside our Deployment. In Kubernetes, a resource request is the amount of CPU or memory that a container initially requests to run, ensuring that the cluster places it on a node with sufficient capacity. Resource limits, on the other hand, define the maximum amount of CPU or memory a container is allowed to consume, preventing it from taking up all the resources and potentially affecting the stability of other containers on the same node. In order to set a resource request/limit on the Deployment, edit the Kubernetes manifest so it includes an `resources` section in the container specification.
 
 ```yaml
 apiVersion: apps/v1
@@ -278,11 +278,44 @@ spec:
         image: nginx:latest
         ports:
         - containerPort: 80
-+       resources:
-+         limits:
-+           cpu: 100m
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          requests:
+            cpu: 100m
+            memory: 256Mi
         volumeMounts:
         - name: workdir
           mountPath: /usr/share/nginx/html
         ...
 ```
+
+Once you've changed the Kubernetes manifest for the Deployment, apply it and check the status of the HPA. It should now look something like this:
+
+```shell
+[vdeborger@node-01 ~]$ kubectl get hpa demo-hpa
+NAME       REFERENCE             TARGETS   MINPODS   MAXPODS   REPLICAS   AGE
+demo-hpa   Deployment/demo-app   0%/25%    3         10        3          5m
+```
+
+### Step 5c: generating load and seeing the HPA in action
+
+Okay, our Deployment is running and the HPA is monitoring the Pods' CPU usage. Everything's ready to actually see the HPA in action. We'll need to create some load on the Pods in order to trigger a scaling event. Let's use a custom I built which uses [baton](https://github.com/americanexpress/baton) to send requests to our Pods: `kubectl run -i --tty cluster-access --rm --image=vincentdebo/baton:latest --restart=Never -- -u http://demo-app -c 4 -t 60`. When you check the status of the HPA now (with `kubectl get hpa demo-hpa --watch` so it auto-updates), you should see it scale up once the CPU utilization goes over the threshold and scale back down once the CPU utilization goes back under the threshold.
+
+```shell
+[vdeborger@node-01 ~]$ kubectl get hpa demo-hpa --watch
+NAME       REFERENCE             TARGETS    MINPODS   MAXPODS   REPLICAS   AGE
+demo-hpa   Deployment/demo-app   0%/25%     3         10        3          21m
+demo-hpa   Deployment/demo-app   166%/25%   3         10        3          22m
+demo-hpa   Deployment/demo-app   213%/25%   3         10        6          22m
+demo-hpa   Deployment/demo-app   190%/25%   3         10        10         22m
+demo-hpa   Deployment/demo-app   61%/25%    3         10        10         22m
+demo-hpa   Deployment/demo-app   20%/25%    3         10        10         23m
+demo-hpa   Deployment/demo-app   0%/25%     3         10        10         23m
+demo-hpa   Deployment/demo-app   0%/25%     3         10        10         27m
+demo-hpa   Deployment/demo-app   0%/25%     3         10        10         28m
+demo-hpa   Deployment/demo-app   0%/25%     3         10        3          28m
+```
+
+While the application is under load and scaled up, you can also see the replica's being created in the Pod overview (`kubectl get pods --selector=app=demo`).
