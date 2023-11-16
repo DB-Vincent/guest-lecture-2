@@ -198,3 +198,91 @@ demo-app-d9f6d5bd5-zrpl6   0/1     PodInitializing   0          4s
 ```
 
 At first, these pods will be in the "PodsInitializing" status; this means that Kubernetes is starting up our initContainer and is executing the commands we defined. After some time, we should see the status change to "Init:0/1" and eventually to "Running". Once that's the case, you can start up our temporary busybox Pod again and execute the `wget` command a couple of times. You should now see that the requests get distributed across our 3 pods.
+
+## Step 5: automatically scale a Deployment
+
+In Kubernetes, there is a specific resource that allows you to horizontally scale a Deployment of ReplicaSet based on specific metrics. These metrics need to be retrieved, in order to make those available, we need to install a component called [metrics-server](https://github.com/kubernetes-sigs/metrics-server). 
+
+### Step 5a: installing metrics-server
+
+The installation can be done by applying the latest manifest: `kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml`. You might notice that the deployment does not become healthy (by executing `kubectl get deployment metrics-server --namespace kube-system`), that is because our kubelet service has been set up without being signed by the cluster's certificate authority. In order to configure metrics-server to allow insecure TLS, execute the following command which adds a specific argument to the startup command: 
+```shell
+kubectl patch deployment metrics-server --namespace kube-system --type='json' \
+  -p='[{"op": "replace", "path": "/spec/template/spec/containers/0/args", "value": [
+  "--cert-dir=/tmp",
+  "--secure-port=4443",
+  "--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
+  "--kubelet-use-node-status-port",
+  "--metric-resolution=15s",
+  "--kubelet-insecure-tls"
+]}]'
+```
+
+After a minute or two, you should see that the metrics-server is healthy with a running pod.
+
+### Step 5b: actually horizontally scaling our Deployment
+
+Now that the metrics-server has been installed, we can create [a Horizontal Pod Autoscaler (HPA)](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/) which will use the metrics exposed by the metrics-server to decide whether extra replica's are required. To do so, we'll start off from a basic template and adjust it to our needs.
+
+```yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: some-cool-autoscaler-name
+  # Defines the labels for the HorizontalPodAutoscaler
+  labels:
+    a-cool-label-name: a-cool-label-value
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: some-cool-deployment-name
+  minReplicas: a-number-of-replicas
+  maxReplicas: a-bigger-number-of-replicas
+  metrics:
+  - type: Resource
+    resource:
+      name: some-resource-metric
+      target:
+        type: a-source-metric-type
+        averageUtilization: a-specific-threshold
+```
+
+We'll take it step by step, so we'll start off with the usual stuff;
+- Our HorizontalPodAutoscaler needs a name, give it a recognizable name, e.g. `demo-hpa`.
+- The HorizontalPodAutoscaler should target the deployment we created earlier, so make sure the name of the Deployment in `scaleTargetRef` matches the one you set earlier.
+- Change the labels so you have a label with the key "app" and the value "demo".
+
+Once that's done, we'll set up the auto scaling part:
+- `minReplicas` defines the lowest number of replica's that should be running, let's say `3`.
+- `maxReplicas` defines the maximum amount of replica's that can run, let's put that at `10`.
+- The resource metric name can be (by default) one of two values: `cpu` or `memory`. For this exercise, we'll fill in `cpu`.
+- The metric type should be set to `Utilization` in order to get the actual utilization.
+- `averageUtilization` can be set to any number betwee 0 and 100, but in this exercise, we'll put it at `25` so we can see some autoscaling action with relatively low usage.
+
+Alright, that's it! Let's apply the Kubernetes manifest and see it in action. After executing the `kubectl apply -f <filename>` command, you can check the status of the HPA using the `kubectl get hpa <hpa-name>` command.
+
+As you might notice, the HPA reports `<unknown>/25%` in the Targets column. This is because we didn't set any resource limits inside our Deployment. In Kubernetes, a resource request is the amount of CPU or memory that a container initially requests to run, ensuring that the cluster places it on a node with sufficient capacity. Resource limits, on the other hand, define the maximum amount of CPU or memory a container is allowed to consume, preventing it from taking up all the resources and potentially affecting the stability of other containers on the same node. In order to set a resource limit on the Deployment, edit the Kubernetes manifest so it includes an `resources` section in the container specification.
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  ...
+spec:
+    ...
+    spec:
+      ...
+      containers:
+      - name: nginx
+        image: nginx:latest
+        ports:
+        - containerPort: 80
++       resources:
++         limits:
++           cpu: 100m
+        volumeMounts:
+        - name: workdir
+          mountPath: /usr/share/nginx/html
+        ...
+```
