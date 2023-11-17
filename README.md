@@ -319,3 +319,109 @@ demo-hpa   Deployment/demo-app   0%/25%     3         10        3          28m
 ```
 
 While the application is under load and scaled up, you can also see the replica's being created in the Pod overview (`kubectl get pods --selector=app=demo`).
+
+## Bonus: using MetalLB to make our application available outside the cluster
+
+MetalLB is an open-source load balancer designed for Kubernetes clusters without native integration with cloud provider load balancers. In contrary to most load balancers, MetalLB has been created for on-premise Kubernetes clusters. MetalLB allows you to provision external IP addresses, providing external access and load balancing for applications running in your Kubernetes cluster.
+
+### Installation
+
+Before we can install MetalLB, we need to make sure that kube-proxy (Kubernetes networking component for service abstraction and load balancing) is running in "strictARP" mode. To edit the kube-proxy config of your cluster, execute `kubectl edit configmap -n kube-system kube-proxy` and set "strictARP" to true:
+
+```yaml
+apiVersion: v1
+data:
+  config.conf: |-
+    ...
+    ipvs:
+      strictARP: true
+    ...
+```
+
+That should be it for kube-proxy, you can always double check the value by executing the `kubectl get configmap -n kube-system kube-proxy -o jsonpath="{.data['config\.conf']}" | grep strictARP` command.
+
+We can now install the MetalLB Kubernetes manifest:
+```shell
+export LATEST_VERSION=$(curl -s https://api.github.com/repos/metallb/metallb/releases/latest | grep \"tag_name\" | cut -d : -f 2,3 | tr -d \" | tr -d , | tr -d " ")
+kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/$LATEST_VERSION/config/manifests/metallb-native.yaml
+```
+
+This will create a couple of resources in your cluster, in the metallb-system namespace. Some of the most noteworthy resources created by the manifest are the following;
+
+- A deployment called "controller"; this is the cluster-wide component that’s responsible for allocating IP addresses, configuring the load balancer, dynamically updating configurations and performing health checks.
+- A daemonset called "speaker"; this component is deployed on each node and is responsible for ensuring that external traffic can reach the services within the Kubernetes cluster.
+- A couple of service accounts along with RBAC permissions which are necessary for the components to function.
+
+You can verify the deployment of the components by executing the following command:
+
+```shell
+[vdeborger@node-01 ~]$ kubectl get pods -n metallb-system
+NAME                          READY   STATUS    RESTARTS   AGE
+controller-595f88d88f-52vzq   1/1     Running   0          1m13s
+speaker-fr8xk                 1/1     Running   0          1m13s
+speaker-qs45k                 1/1     Running   0          1m13s
+speaker-z9rvx                 1/1     Running   0          1m13s
+```
+
+If the components are in a stable "Running" state, the deployment of MetalLB is complete. 
+
+### Configuration
+
+One of the things we need to configure is an IPAddressPool. This resource serves as a configuration that defines a range of IP addresses which can be used for allocating to services with the "LoadBalancer" type.
+
+```yaml
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: lecture
+  namespace: metallb-system
+spec:
+  addresses:
+  - <ip_address_range>
+```
+
+Once you’ve created an MetalLB IP address pool, it’s time to make sure that we can access the services from the IP addresses provided by MetalLB. This is done by creating an "Advertisement" for the IP address pool.
+
+```yaml
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: external-access
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+  - lecture
+```
+
+Once the IPAddressPool and Advertisement have been configured, we can define a service which uses MetalLB to load balance its traffic. There are 2 important items in a Kubernetes service with a MetalLB load balancer;
+
+- The type of the service should be set to "LoadBalancer"
+- An annotation called "metallb.universe.tf/address-pool" has to be added.
+
+You can find an example of a Kubernetes service manifest below;
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo-app
+  annotations:
+    metallb.universe.tf/address-pool: lecture
+spec:
+  type: LoadBalancer
+  selector:
+    app: demo
+  ports:
+  - protocol: TCP
+    port: 80
+```
+
+Once the service has been created, you can verify that the service has received an IP address using the kubectl get service command.
+
+```shell
+[vdeborger@node-01 ~]$ kubectl get service demo-app
+NAME       TYPE           CLUSTER-IP       EXTERNAL-IP      PORT(S)        AGE
+demo-app   LoadBalancer   10.106.252.134   x.x.x.x          80:30821/TCP   1m4s
+```
+
+As you can see in the "EXTERNAL-IP" column, the service has received the IP address "x.x.x.x", which should be the first IP adress in your IPAddressPool range.
