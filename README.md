@@ -6,7 +6,25 @@ Inspiration has been taken from these sources:
 - HorizontalPodScaler walkthrough: [https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/)
 - Setting up & using MetalLB: [https://vincentdeborger.be/blog/exploring-metallb-for-load-balancing-in-scaled-workloads-in-kubernetes](https://vincentdeborger.be/blog/exploring-metallb-for-load-balancing-in-scaled-workloads-in-kubernetes)
 
+--------------------
+
+## Table of contents
+
+- [Step 1: setting up a pod](#step-1-setting-up-a-pod)
+- [Step 2: creating replica's for our pod](#step-2-creating-replicas-for-our-pod)
+- [Step 3: accessing the deployments using a service](#step-3-accessing-the-deployments-using-a-service)
+- [Step 4: identifying which pod we're accessing](#step-4-identifying-which-pod-were-accessing)
+- [Step 5: automatically scale a Deployment](#step-5-automatically-scale-a-deployment)
+  - [Step 5a: installing metrics-server](#step-5a-installing-metrics-server)
+  - [Step 5b: setting up horizontal scaling for our Deployment](#step-5b-setting-up-horizontal-scaling-for-our-deployment)
+  - [Step 5c: generating load and seeing the HPA in action](#step-5c-generating-load-and-seeing-the-hpa-in-action)
+- [Bonus: using MetalLB to make our application available outside the cluster](#bonus-using-metallb-to-make-our-application-available-outside-the-cluster)
+  - [Installation](#installation)
+  - [Configuration](#configuration)
+
 ## Step 1: setting up a pod
+
+**[`^        back to top        ^`](#2nd-guest-lecture--thomas-more)**
 
 A basic pod YAML would look something like this:
 
@@ -42,6 +60,8 @@ demo-app   0/1     ContainerCreating   0          3s
 After some time (usually 30 seconds to a minute), the container image should be pulled and your container should be in the "Running" status. If that's the case, great news, you can continue to step 2! If that's not the case, it's time to open Google and check the Pod's error by executing the `kubectl describe pods demo-app` command.
 
 ## Step 2: creating replica's for our pod
+
+**[`^        back to top        ^`](#2nd-guest-lecture--thomas-more)**
 
 Pods on their own are already pretty useful, but what do you do when you need multiple instances of your application? Well, that's when you start to use Deployments or ReplicaSets. We'll just be focusing on Deployments as they're the most extensive option of the two.
 
@@ -101,6 +121,8 @@ If - for some reason - the deployment does not start up, try to debug it by chec
 
 ## Step 3: accessing the deployments using a service
 
+**[`^        back to top        ^`](#2nd-guest-lecture--thomas-more)**
+
 Now that we have 3 replicas of our application running, it's time to add a service so it can be accessed. For this, we'll use a Kubernetes service which not only enables us to access our application, but this also automatically load balances over our replicas.
 
 Let's start with a basic Service manifest:
@@ -137,6 +159,8 @@ demo-app   ClusterIP   10.99.237.222   <none>        80/TCP    5s
 As you can see, the service has an IP address, but that IP address is an internal Kubernetes service address. This means we can't access it from outside the cluster. In order to check out our application from inside, we can start a temporary Pod in which we can execute commands. Busybox is an ideal container for this use, start a busybox pod using the following command: `kubectl run -i --tty cluster-access --rm --image=busybox:latest --restart=Never -- /bin/sh`. Once the Pod has started, you should see a shell (`/ #`). In this shell, you can now send an HTTP request to our application using wget: `wget -q -O- <service_name_or_service_cluster_ip>`. You should now see a response from NGINX! Exiting out of the busybox Pod can be done by typing `exit` and hitting Enter.
 
 ## Step 4: identifying which pod we're accessing
+
+**[`^        back to top        ^`](#2nd-guest-lecture--thomas-more)**
 
 When you executed the `wget` command in the previous step, you got load balanced to one of our 3 replicas in the Deployment we created earlier. In order to get a view which Pod we actually landed on, we'll add a couple of identifiers to the `index.html` file. For this, we'll use an initContainer. These containers are executed before the containers in the `containers` section are started. This means we can create an index file, put it on a volume and mount that volume to the NGINX container.
 
@@ -200,6 +224,8 @@ demo-app-d9f6d5bd5-zrpl6   0/1     PodInitializing   0          4s
 At first, these pods will be in the "PodsInitializing" status; this means that Kubernetes is starting up our initContainer and is executing the commands we defined. After some time, we should see the status change to "Init:0/1" and eventually to "Running". Once that's the case, you can start up our temporary busybox Pod again and execute the `wget` command a couple of times. You should now see that the requests get distributed across our 3 pods.
 
 ## Step 5: automatically scale a Deployment
+
+**[`^        back to top        ^`](#2nd-guest-lecture--thomas-more)**
 
 In Kubernetes, there is a specific resource that allows you to horizontally scale a Deployment of ReplicaSet based on specific metrics. These metrics need to be retrieved, in order to make those available, we need to install a component called [metrics-server](https://github.com/kubernetes-sigs/metrics-server). 
 
@@ -322,6 +348,8 @@ While the application is under load and scaled up, you can also see the replica'
 
 ## Bonus: using MetalLB to make our application available outside the cluster
 
+**[`^        back to top        ^`](#2nd-guest-lecture--thomas-more)**
+
 MetalLB is an open-source load balancer designed for Kubernetes clusters without native integration with cloud provider load balancers. In contrary to most load balancers, MetalLB has been created for on-premise Kubernetes clusters. MetalLB allows you to provision external IP addresses, providing external access and load balancing for applications running in your Kubernetes cluster.
 
 ### Installation
@@ -424,4 +452,4 @@ NAME       TYPE           CLUSTER-IP       EXTERNAL-IP      PORT(S)        AGE
 demo-app   LoadBalancer   10.106.252.134   x.x.x.x          80:30821/TCP   1m4s
 ```
 
-As you can see in the "EXTERNAL-IP" column, the service has received the IP address "x.x.x.x", which should be the first IP adress in your IPAddressPool range.
+As you can see in the "EXTERNAL-IP" column, the service has received the IP address "x.x.x.x", which should be the first IP adress in your IPAddressPool range. You should now be able to access the application from your local machine using the external IP address.
