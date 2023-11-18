@@ -1,12 +1,10 @@
-# 2nd guest lecture @ Thomas More
+# Autoscaling and Load balancing in Kubernetes
 
 This repository contains all the source files for the second DXC guest lecture at Thomas More.
 
-Inspiration has been taken from these sources:
-- HorizontalPodScaler walkthrough: [https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/)
-- Setting up & using MetalLB: [https://vincentdeborger.be/blog/exploring-metallb-for-load-balancing-in-scaled-workloads-in-kubernetes](https://vincentdeborger.be/blog/exploring-metallb-for-load-balancing-in-scaled-workloads-in-kubernetes)
+We'll delve into the world of scalability and efficient load distribution in Kubernetes. Our focus will be on two crucial aspects: Autoscaling through the HorizonalPodAutoscaler, enabling our applications to flexibly adapt to changing workloads, and Load Balancing with services (and MetalLB), ensuring that the load gets distributed to the verious replica's. 
 
---------------------
+---
 
 ## Table of contents
 
@@ -24,7 +22,7 @@ Inspiration has been taken from these sources:
 
 ## Step 1: setting up a pod
 
-**[`^ back to top ^`](#2nd-guest-lecture--thomas-more)**
+**[`^ back to top ^`](#autoscaling-and-load-balancing-in-kubernetes)**
 
 A basic pod YAML would look something like this:
 
@@ -61,7 +59,7 @@ After some time (usually 30 seconds to a minute), the container image should be 
 
 ## Step 2: creating replica's for our pod
 
-**[`^ back to top ^`](#2nd-guest-lecture--thomas-more)**
+**[`^ back to top ^`](#autoscaling-and-load-balancing-in-kubernetes)**
 
 Pods on their own are already pretty useful, but what do you do when you need multiple instances of your application? Well, that's when you start to use Deployments or ReplicaSets. We'll just be focusing on Deployments as they're the most extensive option of the two.
 
@@ -121,7 +119,7 @@ If - for some reason - the deployment does not start up, try to debug it by chec
 
 ## Step 3: accessing the deployments using a service
 
-**[`^ back to top ^`](#2nd-guest-lecture--thomas-more)**
+**[`^ back to top ^`](#autoscaling-and-load-balancing-in-kubernetes)**
 
 Now that we have 3 replicas of our application running, it's time to add a service so it can be accessed. For this, we'll use a Kubernetes service which not only enables us to access our application, but this also automatically load balances over our replicas.
 
@@ -160,7 +158,7 @@ As you can see, the service has an IP address, but that IP address is an interna
 
 ## Step 4: identifying which pod we're accessing
 
-**[`^ back to top ^`](#2nd-guest-lecture--thomas-more)**
+**[`^ back to top ^`](#autoscaling-and-load-balancing-in-kubernetes)**
 
 When you executed the `wget` command in the previous step, you got load balanced to one of our 3 replicas in the Deployment we created earlier. In order to get a view which Pod we actually landed on, we'll add a couple of identifiers to the `index.html` file. For this, we'll use an initContainer. These containers are executed before the containers in the `containers` section are started. This means we can create an index file, put it on a volume and mount that volume to the NGINX container.
 
@@ -225,7 +223,7 @@ At first, these pods will be in the "PodsInitializing" status; this means that K
 
 ## Step 5: automatically scale a Deployment
 
-**[`^ back to top ^`](#2nd-guest-lecture--thomas-more)**
+**[`^ back to top ^`](#autoscaling-and-load-balancing-in-kubernetes)**
 
 In Kubernetes, there is a specific resource that allows you to horizontally scale a Deployment of ReplicaSet based on specific metrics. These metrics need to be retrieved, in order to make those available, we need to install a component called [metrics-server](https://github.com/kubernetes-sigs/metrics-server). 
 
@@ -348,7 +346,7 @@ While the application is under load and scaled up, you can also see the replica'
 
 ## Bonus: using MetalLB to make our application available outside the cluster
 
-**[`^ back to top ^`](#2nd-guest-lecture--thomas-more)**
+**[`^ back to top ^`](#autoscaling-and-load-balancing-in-kubernetes)**
 
 MetalLB is an open-source load balancer designed for Kubernetes clusters without native integration with cloud provider load balancers. In contrary to most load balancers, MetalLB has been created for on-premise Kubernetes clusters. MetalLB allows you to provision external IP addresses, providing external access and load balancing for applications running in your Kubernetes cluster.
 
@@ -453,3 +451,10 @@ demo-app   LoadBalancer   10.106.252.134   x.x.x.x          80:30821/TCP   1m4s
 ```
 
 As you can see in the "EXTERNAL-IP" column, the service has received the IP address "x.x.x.x", which should be the first IP adress in your IPAddressPool range. You should now be able to access the application from your local machine using the external IP address.
+
+---
+
+Sources:
+- Kubernetes HorizontalPodScaler: [https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/)
+- Kubernetes services: [https://kubernetes.io/docs/concepts/services-networking/service/](https://kubernetes.io/docs/concepts/services-networking/service/)
+- Setting up & using MetalLB: [https://metallb.universe.tf/](https://metallb.universe.tf/)
