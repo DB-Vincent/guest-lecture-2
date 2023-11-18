@@ -24,7 +24,7 @@ Inspiration has been taken from these sources:
 
 ## Step 1: setting up a pod
 
-**[`^        back to top        ^`](#2nd-guest-lecture--thomas-more)**
+**[`^ back to top ^`](#2nd-guest-lecture--thomas-more)**
 
 A basic pod YAML would look something like this:
 
@@ -61,7 +61,7 @@ After some time (usually 30 seconds to a minute), the container image should be 
 
 ## Step 2: creating replica's for our pod
 
-**[`^        back to top        ^`](#2nd-guest-lecture--thomas-more)**
+**[`^ back to top ^`](#2nd-guest-lecture--thomas-more)**
 
 Pods on their own are already pretty useful, but what do you do when you need multiple instances of your application? Well, that's when you start to use Deployments or ReplicaSets. We'll just be focusing on Deployments as they're the most extensive option of the two.
 
@@ -121,7 +121,7 @@ If - for some reason - the deployment does not start up, try to debug it by chec
 
 ## Step 3: accessing the deployments using a service
 
-**[`^        back to top        ^`](#2nd-guest-lecture--thomas-more)**
+**[`^ back to top ^`](#2nd-guest-lecture--thomas-more)**
 
 Now that we have 3 replicas of our application running, it's time to add a service so it can be accessed. For this, we'll use a Kubernetes service which not only enables us to access our application, but this also automatically load balances over our replicas.
 
@@ -160,7 +160,7 @@ As you can see, the service has an IP address, but that IP address is an interna
 
 ## Step 4: identifying which pod we're accessing
 
-**[`^        back to top        ^`](#2nd-guest-lecture--thomas-more)**
+**[`^ back to top ^`](#2nd-guest-lecture--thomas-more)**
 
 When you executed the `wget` command in the previous step, you got load balanced to one of our 3 replicas in the Deployment we created earlier. In order to get a view which Pod we actually landed on, we'll add a couple of identifiers to the `index.html` file. For this, we'll use an initContainer. These containers are executed before the containers in the `containers` section are started. This means we can create an index file, put it on a volume and mount that volume to the NGINX container.
 
@@ -225,7 +225,7 @@ At first, these pods will be in the "PodsInitializing" status; this means that K
 
 ## Step 5: automatically scale a Deployment
 
-**[`^        back to top        ^`](#2nd-guest-lecture--thomas-more)**
+**[`^ back to top ^`](#2nd-guest-lecture--thomas-more)**
 
 In Kubernetes, there is a specific resource that allows you to horizontally scale a Deployment of ReplicaSet based on specific metrics. These metrics need to be retrieved, in order to make those available, we need to install a component called [metrics-server](https://github.com/kubernetes-sigs/metrics-server). 
 
@@ -348,7 +348,7 @@ While the application is under load and scaled up, you can also see the replica'
 
 ## Bonus: using MetalLB to make our application available outside the cluster
 
-**[`^        back to top        ^`](#2nd-guest-lecture--thomas-more)**
+**[`^ back to top ^`](#2nd-guest-lecture--thomas-more)**
 
 MetalLB is an open-source load balancer designed for Kubernetes clusters without native integration with cloud provider load balancers. In contrary to most load balancers, MetalLB has been created for on-premise Kubernetes clusters. MetalLB allows you to provision external IP addresses, providing external access and load balancing for applications running in your Kubernetes cluster.
 
