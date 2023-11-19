@@ -24,7 +24,7 @@ We'll delve into the world of scalability and efficient load distribution in Kub
 
 **[`^ back to top ^`](#autoscaling-and-load-balancing-in-kubernetes)**
 
-A basic pod YAML would look something like this:
+Let's start off with the basics. Before we can create Deployments in our cluster, we'll first create a single pod. Throughout this guest lecture, we'll be working with Kubernetes manifests, which are YAML files defining resources. For a Pod, this YAML file would look something like this:
 
 ```yaml
 apiVersion: v1
