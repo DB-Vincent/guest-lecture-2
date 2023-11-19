@@ -4,6 +4,8 @@ This repository contains all the source files for the second DXC guest lecture a
 
 We'll delve into the world of scalability and efficient load distribution in Kubernetes. Our focus will be on two crucial aspects: Autoscaling through the HorizonalPodAutoscaler, enabling our applications to flexibly adapt to changing workloads, and Load Balancing with services (and MetalLB), ensuring that the load gets distributed to the verious replica's. 
 
+Throughout this guest lecture, we'll be working with Kubernetes manifests, which are YAML files defining resources. After each step, delete the resources created in that step (for example, create a directory for each step and then execute `kubectl delete -f .` in that directory after completing that step).
+
 ---
 
 ## Table of contents
@@ -24,7 +26,7 @@ We'll delve into the world of scalability and efficient load distribution in Kub
 
 **[`^ back to top ^`](#autoscaling-and-load-balancing-in-kubernetes)**
 
-Let's start off with the basics. Before we can create Deployments in our cluster, we'll first create a single pod. Throughout this guest lecture, we'll be working with Kubernetes manifests, which are YAML files defining resources. For a Pod, this YAML file would look something like this:
+Let's start off with the basics. Before we can create Deployments in our cluster, we'll first create a single pod. For a Pod, a Kubernetes manifest file would look something like this:
 
 ```yaml
 apiVersion: v1
