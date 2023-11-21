@@ -235,7 +235,7 @@ demo-app-d9f6d5bd5-fsb8d   0/1     PodInitializing   0          4s
 demo-app-d9f6d5bd5-zrpl6   0/1     PodInitializing   0          4s
 ```
 
-At first, these pods will be in the "PodsInitializing" status; this means that Kubernetes is starting up our initContainer and is executing the commands we defined. After some time, we should see the status change to "Init:0/1" and eventually to "Running". Once that's the case, you can start up our temporary busybox Pod again and execute the `wget -q -O- <service_ip>` command a couple of times. You should now see that the requests get distributed across our 3 pods.
+At first, these pods will be in the "PodsInitializing" status; this means that Kubernetes is starting up our initContainer and is executing the commands we defined. After some time, we should see the status change to "Init:0/1" and eventually to "Running". Once that's the case, you can start up our temporary busybox Pod again and execute the `wget -q -O- <service_address>` command a couple of times. You should now see that the requests get distributed across our 3 pods.
 
 ## Step 5: automatically scale a Deployment
 
