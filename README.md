@@ -2,9 +2,11 @@
 
 This repository contains all the source files for the second DXC guest lecture at Thomas More.
 
-We'll delve into the world of scalability and efficient load distribution in Kubernetes. Our focus will be on two crucial aspects: Autoscaling through the HorizonalPodAutoscaler, enabling our applications to flexibly adapt to changing workloads, and Load Balancing with services (and MetalLB), ensuring that the load gets distributed to the verious replica's. 
+We'll delve into the world of scalability and efficient load distribution in Kubernetes. Our focus will be on two crucial aspects: Autoscaling through the HorizonalPodAutoscaler, enabling our applications to flexibly adapt to changing workloads, and Load Balancing with services (and MetalLB), ensuring that the load gets distributed to the various replica's. 
 
-Throughout this guest lecture, we'll be working with Kubernetes manifests, which are YAML files defining resources. After each step, delete the resources created in that step (for example, create a directory for each step and then execute `kubectl delete -f .` in that directory after completing that step).
+Throughout this guest lecture, we'll be working with Kubernetes manifests, which are YAML files defining resources.
+Keep a record of your manifest files after each step! For example, create a new directory and copy the required manifests as a starting point for the next step.
+Note that you can update the kubernetes resources by applying manifests of the same kind and same name.
 
 ---
 
@@ -57,7 +59,10 @@ NAME       READY   STATUS              RESTARTS   AGE
 demo-app   0/1     ContainerCreating   0          3s
 ```
 
-After some time (usually 30 seconds to a minute), the container image should be pulled and your container should be in the "Running" status. If that's the case, great news, you can continue to step 2! If that's not the case, it's time to open Google and check the Pod's error by executing the `kubectl describe pods demo-app` command.
+After some time (usually 30 seconds to a minute), the container image should be pulled and your container should be in the "Running" status. If that's the case, great news, you can remove the Pod and continue to step 2! If that's not the case, it's time to open Google and check the Pod's error by executing the `kubectl describe pods demo-app` command.
+
+Remove the Pod by executing `kubectl delete -f <filename>`.
+
 
 ## Step 2: creating replica's for our pod
 
@@ -156,7 +161,9 @@ NAME       TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)   AGE
 demo-app   ClusterIP   10.99.237.222   <none>        80/TCP    5s
 ```
 
-As you can see, the service has an IP address, but that IP address is an internal Kubernetes service address. This means we can't access it from outside the cluster. In order to check out our application from inside, we can start a temporary Pod in which we can execute commands. Busybox is an ideal container for this use, start a busybox pod using the following command: `kubectl run -i --tty cluster-access --rm --image=busybox:latest --restart=Never -- /bin/sh`. Once the Pod has started, you should see a shell (`/ #`). In this shell, you can now send an HTTP request to our application using wget: `wget -q -O- <service_name_or_service_cluster_ip>`. You should now see a response from NGINX! Exiting out of the busybox Pod can be done by typing `exit` and hitting Enter.
+As you can see, the service has an IP address, but that IP address is an internal Kubernetes service address. This means we can't access it from outside the cluster. In order to check out our application from inside, we can start a temporary Pod in which we can execute commands. Busybox is an ideal container for this use, start a busybox pod using the following command: `kubectl run -i --tty cluster-access --rm --image=busybox:latest --restart=Never -- /bin/sh`. Once the Pod has started, you should see a shell (`/ #`). In this shell, you can now send an HTTP request to our application using wget: `wget -q -O- <service_address>`. You should now see a response from NGINX! Exiting out of the busybox Pod can be done by typing `exit` and hitting Enter.
+
+Tip: the service address has a standard convention in kubernetes: "<service_name>.<namespace>.svc.cluster.local"
 
 ## Step 4: identifying which pod we're accessing
 
@@ -164,7 +171,7 @@ As you can see, the service has an IP address, but that IP address is an interna
 
 When you executed the `wget` command in the previous step, you got load balanced to one of our 3 replicas in the Deployment we created earlier. In order to get a view which Pod we actually landed on, we'll add a couple of identifiers to the `index.html` file. For this, we'll use an initContainer. These containers are executed before the containers in the `containers` section are started. This means we can create an index file, put it on a volume and mount that volume to the NGINX container.
 
-So, to get started, add a `initContainers` section to your Deployment's spec section on the `template` level. In the `initContainers` section, add a container that uses the busybox image and executes `echo -en "Running $POD_NAME ($POD_IP) on $NODE_NAME\n" > /nginx-temp/index.html`.
+So, to get started, add a `initContainers` section to your Deployment's spec section on the `template spec` level. In the `initContainers` section, add a container that uses the busybox image and executes `echo -en "Running $POD_NAME ($POD_IP) on $NODE_NAME\n" > /nginx-temp/index.html`.
 
 > *Tip*: executing commands when a container starts up can be done using the `command` and `args` parameters inside a container's definition. More information can be found [here](https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#run-a-command-in-a-shell).
 
@@ -174,19 +181,19 @@ The `$POD_NAME`, `$POD_IP` and `$NODE_NAME` environment variables aren't set by 
 env:
 - name: NODE_NAME
   valueFrom:
-  fieldRef:
-    fieldPath: spec.nodeName
+    fieldRef:
+      fieldPath: spec.nodeName
 - name: POD_NAME
   valueFrom:
-  fieldRef:
-    fieldPath: metadata.name
+    fieldRef:
+      fieldPath: metadata.name
 - name: POD_IP
   valueFrom:
-  fieldRef:
-    fieldPath: status.podIP
+    fieldRef:
+      fieldPath: status.podIP
 ```
 
-As you might've also noticed, we're trying to write to an `index.html` file in the `/nginx-temp/` directory. This directory should be a volume. For the sake of simplicity, we'll be using an emptyDir volume which you can define like so:
+As you might have also noticed, we're trying to write to an `index.html` file in the `/nginx-temp/` directory. This directory should be a volume. For the sake of simplicity, we'll be using an emptyDir volume which you can define like so (change the names where appropriate):
 
 ```yaml
 apiVersion: apps/v1
@@ -194,16 +201,23 @@ kind: Deployment
 metadata:
   ...
 spec:
+  ...
+  template:
     spec:
       initContainers:
-      - name: busybox
-        image: busybox:latest
+      - name: a-cool-initcontainer-name
+        image: container-image:image-tag
         ...
         volumeMounts:
         - name: name-of-your-volume
-          mountPath: "/nginx-temp"
+          mountPath: "/a-cool-dir-name"
       containers:
+      - name: a-cool-initcontainer-name
+        image: container-image:image-tag
         ...
+        volumeMounts:
+        - name: name-of-your-volume
+          mountPath: "/another-cool-dir-name"
       volumes:
       - name: name-of-your-volume
         emptyDir: {}
@@ -221,7 +235,7 @@ demo-app-d9f6d5bd5-fsb8d   0/1     PodInitializing   0          4s
 demo-app-d9f6d5bd5-zrpl6   0/1     PodInitializing   0          4s
 ```
 
-At first, these pods will be in the "PodsInitializing" status; this means that Kubernetes is starting up our initContainer and is executing the commands we defined. After some time, we should see the status change to "Init:0/1" and eventually to "Running". Once that's the case, you can start up our temporary busybox Pod again and execute the `wget` command a couple of times. You should now see that the requests get distributed across our 3 pods.
+At first, these pods will be in the "PodsInitializing" status; this means that Kubernetes is starting up our initContainer and is executing the commands we defined. After some time, we should see the status change to "Init:0/1" and eventually to "Running". Once that's the case, you can start up our temporary busybox Pod again and execute the `wget -q -O- <service_ip>` command a couple of times. You should now see that the requests get distributed across our 3 pods.
 
 ## Step 5: automatically scale a Deployment
 
@@ -317,7 +331,7 @@ spec:
         ...
 ```
 
-Once you've changed the Kubernetes manifest for the Deployment, apply it and check the status of the HPA. It should now look something like this:
+Once you've changed the Kubernetes manifest for the Deployment, apply it and check the status of the HPA. Quite soon it should show something like this:
 
 ```shell
 [vdeborger@node-01 ~]$ kubectl get hpa demo-hpa
