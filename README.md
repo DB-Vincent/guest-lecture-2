@@ -163,7 +163,7 @@ demo-app   ClusterIP   10.99.237.222   <none>        80/TCP    5s
 
 As you can see, the service has an IP address, but that IP address is an internal Kubernetes service address. This means we can't access it from outside the cluster. In order to check out our application from inside, we can start a temporary Pod in which we can execute commands. Busybox is an ideal container for this use, start a busybox pod using the following command: `kubectl run -i --tty cluster-access --rm --image=busybox:latest --restart=Never -- /bin/sh`. Once the Pod has started, you should see a shell (`/ #`). In this shell, you can now send an HTTP request to our application using wget: `wget -q -O- <service_address>`. You should now see a response from NGINX! Exiting out of the busybox Pod can be done by typing `exit` and hitting Enter.
 
-> *Tip*: the service address has a standard convention in kubernetes: "<service_name>.<namespace>.svc.cluster.local"
+> *Tip*: the service address has a standard convention in kubernetes: `<service_name>.<namespace>.svc.cluster.local`.
 
 ## Step 4: identifying which pod we're accessing
 
